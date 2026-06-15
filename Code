@@ -1,0 +1,82 @@
+// DANS LA CONSOLE
+// 1. Nettoyage des iframes existantes
+document.querySelectorAll("iframe").forEach(e => e.remove());
+
+const ValidateIframe = (url) => {
+    let iframe = document.createElement("iframe");
+    document.body.appendChild(iframe);
+    iframe.src = url;
+    
+    // Style pour cacher l'iframe proprement
+    Object.assign(iframe.style, {
+        display: "none",
+        opacity: "0",
+        visibility: "hidden"
+    });
+
+    iframe.onload = () => {
+        setTimeout(() => {
+            try {
+                const win = iframe.contentWindow;
+                const $ = win.jQuery;
+
+                if (!$) {
+                    console.error("jQuery non trouvé dans l'iframe pour :", url);
+                    return;
+                }
+
+                // Calcul du temps et des valeurs
+                let startTimeRaw = $("#start_time").val();
+                let startTime = startTimeRaw ? Number(startTimeRaw.split(",")[0]) : Date.now() / 1000;
+                
+                // On recule l'heure de début pour simuler un travail de 2 à 6 minutes
+                let newStartTime = Math.floor(startTime - (Math.random() * 4 + 2) * 60);
+                
+                let numExo = parseInt($("#situation").val() || 0) + 2;
+
+                // Préparation des données
+                let formData = $("form").serializeArray();
+                
+                // Injection des valeurs de réussite
+                const updates = {
+                    "start_time": newStartTime,
+                    "numexo": numExo,
+                    "score": 1, // Score maximum (1 = 100%)
+                    "reponse": "automatique"
+                };
+
+                formData = formData.map(item => {
+                    if (updates[item.name] !== undefined) {
+                        return { name: item.name, value: updates[item.name] };
+                    }
+                    return item;
+                });
+
+                // Envoi de la requête AJAX de validation
+                $.ajax({
+                    url: $("form")[0].action,
+                    type: "POST",
+                    data: $.param(formData),
+                    success: function() {
+                        console.log(`%c Validé : ${url}`, "color: green; font-weight: bold;");
+                        iframe.remove();
+                    },
+                    error: function() {
+                        console.error("Erreur lors de l'envoi pour :", url);
+                        iframe.remove();
+                    }
+                });
+            } catch (err) {
+                console.error("Accès refusé à l'iframe (CORS) :", err);
+                iframe.remove();
+            }
+        }, 3000); // Attente de 3s pour le chargement complet
+    };
+};
+
+// 2. Lancement sur les liens d'exercices
+document.querySelectorAll(".content_list .card_freeze a:not(.pull-right)").forEach(link => {
+    if (link.href && link.href.includes("sacado")) {
+        ValidateIframe(link.href);
+    }
+});
